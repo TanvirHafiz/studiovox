@@ -9,7 +9,7 @@ import shutil
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -28,6 +28,19 @@ logger = setup_logging()
 app = FastAPI(title="StudioVox")
 
 WEB_DIR = REPO_ROOT / "web"
+
+
+@app.middleware("http")
+async def no_cache_for_ui(request: Request, call_next):
+    """The UI (index.html/app.js/styles.css) changes across phases while this app is under
+    active development. A browser that cached an old page against new JS (or vice versa) can
+    silently reference DOM elements that no longer exist, breaking features with no visible
+    error. Disabling caching for the UI shell removes that whole class of confusing bugs.
+    """
+    response = await call_next(request)
+    if request.url.path == "/" or request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
 UPLOADS_DIR = config.jobs_dir / "_uploads"
 
 

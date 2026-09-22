@@ -42,17 +42,27 @@ const state = {
 // ---- Presets ----
 
 async function loadPresets() {
-  const res = await fetch("/api/presets");
-  state.presets = await res.json();
   const select = document.getElementById("preset-select");
-  select.innerHTML = "";
-  for (const [key, preset] of Object.entries(state.presets)) {
-    const opt = document.createElement("option");
-    opt.value = key;
-    opt.textContent = preset.name;
-    select.appendChild(opt);
+  if (!select) {
+    console.error("loadPresets: #preset-select not found in the DOM (stale page cache?)");
+    return;
   }
-  updatePresetDescription();
+  try {
+    const res = await fetch("/api/presets");
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    state.presets = await res.json();
+    select.innerHTML = "";
+    for (const [key, preset] of Object.entries(state.presets)) {
+      const opt = document.createElement("option");
+      opt.value = key;
+      opt.textContent = preset.name;
+      select.appendChild(opt);
+    }
+    updatePresetDescription();
+  } catch (e) {
+    console.error("Failed to load presets:", e);
+    select.innerHTML = '<option value="">Failed to load presets - reload the page</option>';
+  }
 }
 
 function updatePresetDescription() {
@@ -67,6 +77,10 @@ function updatePresetDescription() {
 function setupDropzone() {
   const zone = document.getElementById("dropzone");
   const input = document.getElementById("file-input");
+  if (!zone || !input) {
+    console.error("setupDropzone: #dropzone or #file-input not found in the DOM (stale page cache?)");
+    return;
+  }
 
   zone.addEventListener("click", () => input.click());
   input.addEventListener("change", () => {

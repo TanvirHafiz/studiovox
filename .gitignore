@@ -1,0 +1,11 @@
+.venv/
+env/
+*.pyc
+__pycache__/
+models/
+jobs/
+logs/
+*.wav
+*.flac
+*.mp3
+.DS_Store

@@ -1,0 +1,25 @@
+# StudioVox configuration. All paths may be absolute or relative to the repo root.
+
+server:
+  host: 127.0.0.1
+  port: 7860
+  open_browser: true
+
+paths:
+  ffmpeg: ffmpeg          # path to ffmpeg.exe, or just "ffmpeg" if on PATH
+  ffprobe: ffprobe
+  models_dir: models
+  jobs_dir: jobs
+  logs_dir: logs
+  presets_dir: presets
+  engines_dir: engines
+
+gpu:
+  require: false          # if true, refuse to start jobs that need GPU when none is detected
+
+audio:
+  internal_sample_rate: 48000
+  internal_channels: mono  # mono | stereo_split
+
+nvidia_afx:
+  sdk_path: null           # set once the NVIDIA AFX SDK is installed locally

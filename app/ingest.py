@@ -9,7 +9,21 @@ from pathlib import Path
 
 from app.config import config
 
-VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv", ".avi", ".webm", ".m4v"}
+
+def _has_real_video_stream(info: dict) -> bool:
+    """True if the file has an actual video track, not just embedded cover art.
+
+    File extension alone is not reliable: e.g. WhatsApp/some recorders export
+    audio-only recordings in an .mp4 container, and many audio formats carry a
+    single attached picture as a "video" stream for album art.
+    """
+    for s in info.get("streams", []):
+        if s.get("codec_type") != "video":
+            continue
+        if s.get("disposition", {}).get("attached_pic"):
+            continue
+        return True
+    return False
 
 
 @dataclass
@@ -52,11 +66,12 @@ def decode_to_wav(input_path: Path, out_wav: Path, sample_rate: int, channels: i
     duration = float(info.get("format", {}).get("duration", astream.get("duration", 0.0)) or 0.0)
     source_sr = int(astream.get("sample_rate", sample_rate))
     source_ch = int(astream.get("channels", 1))
-    is_video = input_path.suffix.lower() in VIDEO_EXTENSIONS
+    is_video = _has_real_video_stream(info)
 
     out_wav.parent.mkdir(parents=True, exist_ok=True)
     cmd = [
         config.ffmpeg,
+        "-hide_banner",
         "-y",
         "-i",
         str(input_path),
@@ -89,6 +104,7 @@ def remux_audio_into_video(video_path: Path, new_audio_wav: Path, out_path: Path
     out_path.parent.mkdir(parents=True, exist_ok=True)
     cmd = [
         config.ffmpeg,
+        "-hide_banner",
         "-y",
         "-i",
         str(video_path),

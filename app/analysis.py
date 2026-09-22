@@ -6,6 +6,7 @@ from dataclasses import dataclass, asdict
 from typing import Any
 
 import numpy as np
+import pyloudnorm as pyln
 
 
 @dataclass
@@ -13,6 +14,7 @@ class AnalysisResult:
     duration_seconds: float
     sample_rate: int
     peak_dbfs: float
+    lufs: float
     clipping_percent: float
     noise_floor_dbfs: float
     bandwidth_hz: float
@@ -125,6 +127,12 @@ def analyze(x: np.ndarray, sr: int) -> AnalysisResult:
     noise_floor = _noise_floor_dbfs(x, sr)
     bandwidth = _estimate_bandwidth_hz(x, sr)
     mode = _guess_mode(x, sr)
+    try:
+        lufs = float(pyln.Meter(sr).integrated_loudness(x.astype(np.float64)))
+        if not np.isfinite(lufs):
+            lufs = -70.0
+    except Exception:  # noqa: BLE001
+        lufs = -70.0
 
     if clip_pct > 0.1:
         warnings.append(f"Clipping detected ({clip_pct:.2f}% of samples). Cannot be fully repaired.")
@@ -137,6 +145,7 @@ def analyze(x: np.ndarray, sr: int) -> AnalysisResult:
         duration_seconds=x.size / sr,
         sample_rate=sr,
         peak_dbfs=round(peak, 2),
+        lufs=round(lufs, 2),
         clipping_percent=round(clip_pct, 4),
         noise_floor_dbfs=round(noise_floor, 2),
         bandwidth_hz=round(bandwidth, 1),

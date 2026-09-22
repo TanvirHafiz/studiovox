@@ -21,9 +21,52 @@
 
   <section class="panel">
     <h2>Process a file</h2>
-    <div class="dropzone">Drag and drop coming in Phase 2. Use the CLI for now.</div>
+    <div id="dropzone" class="dropzone">
+      <p>Drag and drop an audio or video file here, or click to browse.</p>
+      <input id="file-input" type="file" accept="audio/*,video/*" hidden>
+    </div>
+    <div id="file-info" class="hidden">
+      <div class="file-row">
+        <strong id="file-name"></strong>
+        <span id="file-duration" class="detail"></span>
+      </div>
+      <div id="analysis-warnings"></div>
+      <div id="analysis-metrics" class="metrics-grid"></div>
+    </div>
+  </section>
+
+  <section id="pipeline-panel" class="panel hidden">
+    <h2>Pipeline</h2>
+    <label for="preset-select">Preset</label>
+    <select id="preset-select"></select>
+    <p id="preset-description" class="detail"></p>
+    <button id="run-button" class="primary-button">Run</button>
+  </section>
+
+  <section id="progress-panel" class="panel hidden">
+    <h2>Progress</h2>
+    <div id="stage-label" class="detail"></div>
+    <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+  </section>
+
+  <section id="results-panel" class="panel hidden">
+    <h2>Result</h2>
+    <div class="ab-controls">
+      <button id="play-button" class="primary-button">Play</button>
+      <button id="ab-original" class="ab-button">A: Original</button>
+      <button id="ab-final" class="ab-button active">B: Final</button>
+      <span class="detail">Keys: A / B to switch, Space to play/pause</span>
+    </div>
+    <input id="seek-bar" type="range" min="0" max="1000" value="0" step="1">
+    <div id="loudness-info" class="detail"></div>
+    <div class="export-row">
+      <a id="download-link" class="primary-button" href="#" download>Download WAV</a>
+      <a id="download-video-link" class="primary-button hidden" href="#" download>Download video</a>
+    </div>
   </section>
 </main>
+<audio id="orig-audio" preload="auto" crossorigin="anonymous"></audio>
+<audio id="final-audio" preload="auto" crossorigin="anonymous"></audio>
 <script src="/static/app.js"></script>
 </body>
 </html>

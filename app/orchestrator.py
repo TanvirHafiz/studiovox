@@ -18,6 +18,7 @@ from app.audio_io import read_wav_mono, resample, write_wav
 from app.chunking import plan_chunks, recombine, split
 from app.config import config
 from app.dsp.chain import run_finishing_chain
+from app.dsp.loudness import measure_lufs
 from app.engines import get_engine
 from app.ingest import decode_to_wav, remux_audio_into_video
 from app.logging_setup import job_logger
@@ -34,9 +35,10 @@ class JobResult:
     job_json_path: Path
 
 
-def new_job_dir(input_path: Path) -> tuple[str, Path]:
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    job_id = f"{ts}_{input_path.stem}_{uuid.uuid4().hex[:6]}"
+def new_job_dir(input_path: Path, job_id: str | None = None) -> tuple[str, Path]:
+    if job_id is None:
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        job_id = f"{ts}_{input_path.stem}_{uuid.uuid4().hex[:6]}"
     job_dir = config.jobs_dir / job_id
     job_dir.mkdir(parents=True, exist_ok=False)
     return job_id, job_dir
@@ -93,13 +95,14 @@ def run_job(
     preset_key: str,
     on_progress: Callable[[str, float], None] | None = None,
     export_intermediate: bool = False,
+    job_id: str | None = None,
 ) -> JobResult:
     input_path = Path(input_path).resolve()
     if not input_path.exists():
         raise FileNotFoundError(input_path)
 
     preset = get_preset(preset_key)
-    job_id, job_dir = new_job_dir(input_path)
+    job_id, job_dir = new_job_dir(input_path, job_id=job_id)
     logger = job_logger(job_id, job_dir)
     logger.info("Starting job for %s with preset '%s'", input_path, preset_key)
 
@@ -159,6 +162,10 @@ def run_job(
         output_video = job_dir / f"output{input_path.suffix}"
         remux_audio_into_video(input_path, output_wav, output_video)
 
+    final_lufs = measure_lufs(finished, sr)
+    if not np.isfinite(final_lufs):
+        final_lufs = -70.0
+
     job_json_path = job_dir / "job.json"
     job_data = {
         "job_id": job_id,
@@ -166,6 +173,7 @@ def run_job(
         "preset": preset_key,
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "analysis": analysis_result.to_dict(),
+        "final_lufs": round(final_lufs, 2),
         "is_video": ingest_info.is_video,
         "output_wav": str(output_wav),
         "output_video": str(output_video) if output_video else None,

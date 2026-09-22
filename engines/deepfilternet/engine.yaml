@@ -1,0 +1,12 @@
+name: deepfilternet
+python: engines/deepfilternet/env/Scripts/python.exe
+sample_rates: [48000]
+channels: mono
+max_chunk_seconds: 60
+needs_gpu: true
+vram_gb_estimate: 2
+license: MIT
+tasks: [denoise]
+notes: >
+  torch/torchaudio pinned to 2.7.1 (cu128) because torchaudio >=2.9 removed
+  the load/save/info I/O backend that deepfilternet's df.io module depends on.

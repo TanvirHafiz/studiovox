@@ -1,0 +1,22 @@
+name: Clean Voiceover
+description: Faithful, natural cleanup for a decent recording.
+stages:
+  denoise:
+    enabled: true
+    engine: deepfilternet
+    strength: 1.0
+finishing:
+  high_pass_hz: 80
+  high_pass_db_per_oct: 18
+  mud_cut_hz: 300
+  mud_cut_db: -1.5
+  presence_hz: 4000
+  presence_db: 1.0
+  air_shelf_hz: 10000
+  air_shelf_db: 1.0
+  deesser_enabled: true
+  compressor_enabled: true
+  compressor_threshold_db: -20
+  compressor_ratio: 2.5
+  breath_reduction_enabled: false
+  loudness_target: youtube

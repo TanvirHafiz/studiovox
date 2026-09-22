@@ -1,0 +1,23 @@
+name: Podcast
+description: DeepFilterNet cleanup with breath reduction, podcast loudness.
+stages:
+  denoise:
+    enabled: true
+    engine: deepfilternet
+    strength: 1.0
+finishing:
+  high_pass_hz: 85
+  high_pass_db_per_oct: 18
+  mud_cut_hz: 300
+  mud_cut_db: -2.0
+  presence_hz: 3500
+  presence_db: 1.5
+  air_shelf_hz: 10000
+  air_shelf_db: 1.0
+  deesser_enabled: true
+  compressor_enabled: true
+  compressor_threshold_db: -18
+  compressor_ratio: 3.0
+  breath_reduction_enabled: true
+  breath_attenuation_db: -8
+  loudness_target: podcast

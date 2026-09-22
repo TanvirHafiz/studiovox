@@ -6,10 +6,16 @@ This is a partial repair only, never a full recovery of clipped information.
 from __future__ import annotations
 
 import numpy as np
-from scipy.interpolate import CubicSpline
+from scipy.interpolate import PchipInterpolator
 
 
 def declip(x: np.ndarray, threshold: float = 0.99, max_run_samples: int = 400) -> np.ndarray:
+    """PCHIP (shape-preserving Hermite) interpolation, not a plain cubic spline: an
+    unconstrained cubic spline overshoots past the surrounding sample range right where
+    a clipped run resumes (Runge's phenomenon), which can push the reconstructed peak
+    higher than the original clipping - actively worse than doing nothing. PCHIP never
+    overshoots the data it interpolates between.
+    """
     y = x.copy()
     clipped = np.abs(x) >= threshold
     if not np.any(clipped):
@@ -28,8 +34,8 @@ def declip(x: np.ndarray, threshold: float = 0.99, max_run_samples: int = 400) -
             continue
         anchor_val = x[anchor_idx]
         try:
-            spline = CubicSpline(anchor_idx, anchor_val)
-            y[start:end] = spline(np.arange(start, end))
+            interp = PchipInterpolator(anchor_idx, anchor_val)
+            y[start:end] = interp(np.arange(start, end))
         except Exception:
             continue
     return y.astype(np.float32)

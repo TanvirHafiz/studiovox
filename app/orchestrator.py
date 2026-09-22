@@ -18,7 +18,7 @@ from app.audio_io import read_wav_mono, resample, write_wav
 from app.chunking import plan_chunks, recombine, split
 from app.config import config
 from app.dsp.chain import run_finishing_chain
-from app.dsp.loudness import measure_lufs
+from app.dsp.loudness import measure_lufs, true_peak_limiter
 from app.engines import get_engine
 from app.ingest import decode_to_wav, remux_audio_into_video
 from app.logging_setup import job_logger
@@ -129,7 +129,20 @@ def run_job(
 
     current = x
     if export_intermediate:
-        write_wav(job_dir / "01_original.wav", current, sr)
+        # FLOAT, not the default PCM_24: intermediate exports are for diagnosis, and PCM_24
+        # silently hard-clips any sample above +-1.0, which would hide the exact bug a
+        # true-peak-over source (lossy-codec overshoot, hot mic) is here to help debug.
+        write_wav(job_dir / "01_original.wav", current, sr, subtype="FLOAT")
+
+    # Stage 1: pre-denoise safety limiter. DeepFilterNet (and neural denoisers generally)
+    # can produce pathological full-scale oscillating output when fed samples above +-1.0
+    # true peak - a real recording defect (hot mic, or overshoot from lossy source codecs
+    # like AAC/m4a), not something the 0.1%-clipping-triggered optional declip stage catches
+    # since it can be well under that threshold. This runs unconditionally: it is a no-op
+    # (no gain change) on audio that never exceeds the ceiling.
+    if analysis_result.peak_dbfs > -1.0:
+        logger.info("Pre-denoise safety limiting: peak was %.2f dBFS", analysis_result.peak_dbfs)
+        current = true_peak_limiter(current, sr, ceiling_dbtp=-1.0)
 
     # Stage 2: denoise
     if preset.denoise_enabled:
@@ -138,7 +151,7 @@ def run_job(
             current, sr, preset, job_dir, on_progress=lambda f: report("denoise", f)
         )
         if export_intermediate:
-            write_wav(job_dir / "02_denoise.wav", current, sr)
+            write_wav(job_dir / "02_denoise.wav", current, sr, subtype="FLOAT")
         report("denoise", 1.0)
 
     # Stage 6: finishing chain

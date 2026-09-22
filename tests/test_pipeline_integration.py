@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from app.audio_io import read_wav_mono
+from app.audio_io import read_wav_mono, write_wav
 from app.chunking import plan_chunks
 from app.dsp.loudness import measure_lufs
 from app.engines import get_engine
@@ -65,3 +65,27 @@ def test_ten_minute_file_processes_cleanly():
             f"Chunk boundary discontinuity at sample {boundary}: "
             f"{window.max()} vs baseline {baseline}"
         )
+
+
+@pytest.mark.skipif(not _engine_installed(), reason="deepfilternet engine not installed")
+def test_over_unity_peak_does_not_break_denoiser(tmp_path):
+    """Regression test: a source with a true peak above +-1.0 (hot mic, or lossy-codec
+    (e.g. AAC/m4a) decode overshoot) previously made DeepFilterNet emit a pathological
+    full-scale oscillating burst instead of denoised audio. The pre-denoise safety
+    limiter in orchestrator.run_job should prevent that unconditionally.
+    """
+    sr = 48000
+    t = np.linspace(0, 3, sr * 3, endpoint=False, dtype=np.float32)
+    x = 0.3 * np.sin(2 * np.pi * 220 * t).astype(np.float32)
+    # Inject a true-peak-over burst like AAC decode ringing around a loud transient.
+    burst = slice(int(0.5 * sr), int(0.5 * sr) + 40)
+    x[burst] = 1.3 * np.sin(np.linspace(0, 8 * np.pi, burst.stop - burst.start))
+
+    src = tmp_path / "hot_mic.wav"
+    write_wav(src, x, sr, subtype="FLOAT")
+
+    result = run_job(src, "clean_voiceover", export_intermediate=True)
+    denoised, _ = read_wav_mono(result.job_dir / "02_denoise.wav")
+
+    diffs = np.abs(np.diff(denoised))
+    assert diffs.max() < 1.0, f"Denoiser produced a full-scale artifact: max diff {diffs.max()}"

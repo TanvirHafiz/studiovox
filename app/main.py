@@ -97,7 +97,7 @@ def analyze_endpoint(req: AnalyzeRequest):
     finally:
         tmp_wav.unlink(missing_ok=True)
 
-    suggested_preset = "clean_voiceover"
+    suggested_preset = "singing_vocal" if result.mode_guess == "singing" else "clean_voiceover"
     return {
         "analysis": result.to_dict(),
         "suggested_preset": suggested_preset,

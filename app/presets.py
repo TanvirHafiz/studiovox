@@ -33,6 +33,11 @@ class Preset:
         return float(self.stages.get("denoise", {}).get("strength", 1.0))
 
     @property
+    def denoise_task(self) -> str:
+        """'denoise' (default) or 'vocal_isolation' for the singing preset (separator engine)."""
+        return self.stages.get("denoise", {}).get("task", "denoise")
+
+    @property
     def dereverb_enabled(self) -> bool:
         return bool(self.stages.get("dereverb", {}).get("enabled", False))
 

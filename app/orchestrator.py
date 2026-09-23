@@ -218,11 +218,11 @@ def run_job(
         logger.info("Pre-denoise safety limiting: peak was %.2f dBFS", analysis_result.peak_dbfs)
         current = true_peak_limiter(current, sr, ceiling_dbtp=-1.0)
 
-    # Stage 2: denoise
+    # Stage 2: denoise (or vocal isolation, for the singing preset - same slot, different task)
     if preset.denoise_enabled:
         report("denoise", 0.0)
         current = _run_engine_stage(
-            current, sr, preset.denoise_engine, "denoise",
+            current, sr, preset.denoise_engine, preset.denoise_task,
             {"strength": preset.denoise_strength}, job_dir, "denoise",
             on_progress=lambda f: report("denoise", f),
         )

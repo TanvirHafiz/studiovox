@@ -1,0 +1,29 @@
+name: Singing Vocal
+description: Vocal isolation for singing. No speech denoisers (they damage vibrato and sustained notes), light dereverb, exported as an unnormalized stem for mixing.
+stages:
+  denoise:
+    enabled: true
+    engine: separator
+    task: vocal_isolation
+  dereverb:
+    enabled: true
+    engine: separator
+    strength: 0.4
+  super_resolution:
+    mode: "off"
+  generative_restore:
+    enabled: false
+finishing:
+  high_pass_hz: 40
+  high_pass_db_per_oct: 12
+  mud_cut_hz: 300
+  mud_cut_db: 0
+  presence_hz: 4000
+  presence_db: 0
+  air_shelf_hz: 10000
+  air_shelf_db: 0
+  deesser_enabled: false
+  compressor_enabled: false
+  breath_reduction_enabled: false
+  loudness_target: stem
+  stem_peak_dbfs: -6.0

@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from app.dsp.filters import high_pass, peaking_eq, high_shelf
+from app.dsp.filters import high_pass, peaking_eq, high_shelf, low_shelf
 from app.dsp.dynamics import compressor, de_esser
 
 
@@ -27,6 +27,24 @@ def test_high_pass_passes_mid_frequency():
     in_rms = np.sqrt(np.mean(mid[sr // 2 :] ** 2))
     out_rms = np.sqrt(np.mean(y[sr // 2 :] ** 2))
     assert out_rms > in_rms * 0.9
+
+
+def test_low_shelf_boosts_low_frequency():
+    sr = 48000
+    low = _tone(100, sr)
+    y = low_shelf(low, sr, freq=150, gain_db=6.0)
+    in_rms = np.sqrt(np.mean(low[sr // 2 :] ** 2))
+    out_rms = np.sqrt(np.mean(y[sr // 2 :] ** 2))
+    assert out_rms > in_rms * 1.5  # roughly +6dB should about double amplitude
+
+
+def test_low_shelf_leaves_high_frequency_unaffected():
+    sr = 48000
+    high = _tone(8000, sr)
+    y = low_shelf(high, sr, freq=150, gain_db=6.0)
+    in_rms = np.sqrt(np.mean(high[sr // 2 :] ** 2))
+    out_rms = np.sqrt(np.mean(y[sr // 2 :] ** 2))
+    assert abs(out_rms - in_rms) < in_rms * 0.1
 
 
 def test_no_nan_inf_from_filters():

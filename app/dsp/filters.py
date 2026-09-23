@@ -23,6 +23,24 @@ def _biquad_peaking(freq: float, sr: int, gain_db: float, q: float = 1.0) -> np.
     return tf2sos(b, a)
 
 
+def _biquad_low_shelf(freq: float, sr: int, gain_db: float, q: float = 0.707) -> np.ndarray:
+    a = 10 ** (gain_db / 40)
+    w0 = 2 * np.pi * freq / sr
+    alpha = np.sin(w0) / (2 * q)
+    cos_w0 = np.cos(w0)
+    sqrt_a = np.sqrt(a)
+
+    b0 = a * ((a + 1) - (a - 1) * cos_w0 + 2 * sqrt_a * alpha)
+    b1 = 2 * a * ((a - 1) - (a + 1) * cos_w0)
+    b2 = a * ((a + 1) - (a - 1) * cos_w0 - 2 * sqrt_a * alpha)
+    a0 = (a + 1) + (a - 1) * cos_w0 + 2 * sqrt_a * alpha
+    a1 = -2 * ((a - 1) + (a + 1) * cos_w0)
+    a2 = (a + 1) + (a - 1) * cos_w0 - 2 * sqrt_a * alpha
+    b = np.array([b0, b1, b2]) / a0
+    a = np.array([1.0, a1 / a0, a2 / a0])
+    return tf2sos(b, a)
+
+
 def _biquad_high_shelf(freq: float, sr: int, gain_db: float, q: float = 0.707) -> np.ndarray:
     a = 10 ** (gain_db / 40)
     w0 = 2 * np.pi * freq / sr
@@ -78,6 +96,13 @@ def high_shelf(x: np.ndarray, sr: int, freq: float, gain_db: float, q: float = 0
     if abs(gain_db) < 0.01:
         return x
     sos = _biquad_high_shelf(freq, sr, gain_db, q)
+    return sosfilt(sos, x).astype(np.float32)
+
+
+def low_shelf(x: np.ndarray, sr: int, freq: float, gain_db: float, q: float = 0.707) -> np.ndarray:
+    if abs(gain_db) < 0.01:
+        return x
+    sos = _biquad_low_shelf(freq, sr, gain_db, q)
     return sosfilt(sos, x).astype(np.float32)
 
 

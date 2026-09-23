@@ -1,0 +1,27 @@
+name: Heavy Voice
+description: Creative effect, not a restoration preset. Adds low-end depth and weight for a heavier, darker tone - deep bass boost, reduced brightness, slower compression to let low-end thump through.
+stages:
+  denoise:
+    enabled: true
+    engine: deepfilternet
+    strength: 0.6
+finishing:
+  high_pass_hz: 30
+  high_pass_db_per_oct: 12
+  low_shelf_hz: 150
+  low_shelf_db: 6.0
+  mud_cut_hz: 300
+  mud_cut_db: 0
+  presence_hz: 3000
+  presence_db: -2.0
+  air_shelf_hz: 8500
+  air_shelf_db: -4.0
+  deesser_enabled: true
+  deesser_threshold_db: -20
+  compressor_enabled: true
+  compressor_threshold_db: -18
+  compressor_ratio: 3.5
+  compressor_attack_ms: 30
+  compressor_release_ms: 150
+  breath_reduction_enabled: false
+  loudness_target: youtube

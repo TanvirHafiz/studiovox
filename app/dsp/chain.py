@@ -23,6 +23,8 @@ LOUDNESS_TARGETS = {
 class FinishingParams:
     high_pass_hz: float = 80.0
     high_pass_db_per_oct: int = 18
+    low_shelf_hz: float = 150.0
+    low_shelf_db: float = 0.0
     mud_cut_hz: float = 300.0
     mud_cut_db: float = 0.0
     presence_hz: float = 4000.0
@@ -48,6 +50,7 @@ def run_finishing_chain(x: np.ndarray, sr: int, params: FinishingParams) -> np.n
     y = x.astype(np.float32)
 
     y = filters.high_pass(y, sr, params.high_pass_hz, params.high_pass_db_per_oct)
+    y = filters.low_shelf(y, sr, params.low_shelf_hz, params.low_shelf_db)
     y = filters.peaking_eq(y, sr, params.mud_cut_hz, params.mud_cut_db, q=1.0)
     y = filters.peaking_eq(y, sr, params.presence_hz, params.presence_db, q=1.0)
     y = filters.high_shelf(y, sr, params.air_shelf_hz, params.air_shelf_db)

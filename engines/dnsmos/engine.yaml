@@ -1,0 +1,13 @@
+name: dnsmos
+python: engines/dnsmos/env/Scripts/python.exe
+sample_rates: [48000]
+channels: mono
+max_chunk_seconds: 3600
+needs_gpu: false
+vram_gb_estimate: 0
+license: CC-BY-4.0
+tasks: [score]
+notes: >
+  ONNX models (sig_bak_ovr.onnx, model_v8.onnx) from microsoft/DNS-Challenge,
+  downloaded into models/dnsmos/. CPU-only inference; the models are tiny and
+  scoring a clip is fast even without a GPU.

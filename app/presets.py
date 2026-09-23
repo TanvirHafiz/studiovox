@@ -32,6 +32,32 @@ class Preset:
     def denoise_strength(self) -> float:
         return float(self.stages.get("denoise", {}).get("strength", 1.0))
 
+    @property
+    def dereverb_enabled(self) -> bool:
+        return bool(self.stages.get("dereverb", {}).get("enabled", False))
+
+    @property
+    def dereverb_engine(self) -> str:
+        return self.stages.get("dereverb", {}).get("engine", "separator")
+
+    @property
+    def dereverb_strength(self) -> float:
+        """Wet/dry blend: 1.0 = fully dereverbed, 0.0 = original (bypassed)."""
+        return float(self.stages.get("dereverb", {}).get("strength", 1.0))
+
+    @property
+    def super_resolution_mode(self) -> str:
+        """'auto' (only when source bandwidth is low), 'always', or 'off'."""
+        return self.stages.get("super_resolution", {}).get("mode", "auto")
+
+    @property
+    def super_resolution_engine(self) -> str:
+        return self.stages.get("super_resolution", {}).get("engine", "clearervoice")
+
+    @property
+    def super_resolution_bandwidth_threshold_hz(self) -> float:
+        return float(self.stages.get("super_resolution", {}).get("bandwidth_threshold_hz", 14000))
+
 
 def _load_one(path: Path) -> Preset:
     with open(path, "r", encoding="utf-8") as f:

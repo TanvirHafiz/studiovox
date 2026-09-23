@@ -279,7 +279,36 @@ async function loadResults(jobId) {
     videoLink.classList.add("hidden");
   }
 
+  renderMetricsTable(data.job.metrics || []);
+
   document.getElementById("results-panel").classList.remove("hidden");
+}
+
+function renderMetricsTable(metrics) {
+  const container = document.getElementById("metrics-table");
+  if (!metrics.length) {
+    container.innerHTML = '<p class="detail">DNSMOS scoring is not available (dnsmos engine not installed).</p>';
+    return;
+  }
+
+  let prevOvrl = null;
+  const rows = metrics
+    .map((m) => {
+      const flagged = prevOvrl !== null && m.ovrl !== null && prevOvrl - m.ovrl > 0.2;
+      const rowClass = flagged ? ' class="metric-row-flagged"' : "";
+      prevOvrl = m.ovrl;
+      const fmt = (v) => (v === null || v === undefined ? "-" : v.toFixed(2));
+      return `<tr${rowClass}><td>${m.stage}</td><td>${fmt(m.sig)}</td><td>${fmt(m.bak)}</td><td>${fmt(m.ovrl)}</td></tr>`;
+    })
+    .join("");
+
+  container.innerHTML = `
+    <table class="metrics-table">
+      <thead><tr><th>Stage</th><th>SIG</th><th>BAK</th><th>OVRL</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <p class="detail">DNSMOS P.835 (higher is better, 1-5 scale). Rows in orange dropped OVRL by more than 0.2 from the previous stage.</p>
+  `;
 }
 
 function setupPlayer(jobId, origLufs, finalLufs) {

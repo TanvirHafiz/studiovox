@@ -9,6 +9,7 @@ import subprocess
 from pathlib import Path
 from typing import Callable
 
+from app.config import config
 from app.engines import EngineSpec
 
 
@@ -37,12 +38,20 @@ def run_worker(
         json.dumps(params),
     ]
 
+    # Some engine libraries (ClearerVoice observed) download weights into a path relative to
+    # the process's working directory rather than an absolute location we control, which would
+    # otherwise pollute the repo root. Give every worker a per-engine cwd under models/ so any
+    # such relative downloads land in the right place regardless of which engine does it.
+    engine_cwd = config.models_dir / engine.name
+    engine_cwd.mkdir(parents=True, exist_ok=True)
+
     proc = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
         bufsize=1,
+        cwd=str(engine_cwd),
     )
 
     result: dict | None = None

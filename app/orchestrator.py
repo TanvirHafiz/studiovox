@@ -25,6 +25,8 @@ from app.logging_setup import job_logger
 from app.presets import Preset, get_preset
 from app.worker_runner import run_worker
 
+OVRL_DROP_WARNING_THRESHOLD = 0.2  # flag a stage that lowers DNSMOS OVRL by more than this
+
 
 @dataclass
 class JobResult:
@@ -44,21 +46,38 @@ def new_job_dir(input_path: Path, job_id: str | None = None) -> tuple[str, Path]
     return job_id, job_dir
 
 
-def _run_denoise_stage(
+def _match_length(x: np.ndarray, target_len: int) -> np.ndarray:
+    """Pad or trim to an exact sample count. Rate conversion (resample) can drift by a
+    handful of samples, and engine stages must not silently shift the pipeline's length.
+    """
+    if x.size == target_len:
+        return x
+    if x.size < target_len:
+        return np.pad(x, (0, target_len - x.size))
+    return x[:target_len]
+
+
+def _run_engine_stage(
     x: np.ndarray,
     sr: int,
-    preset: Preset,
+    engine_name: str,
+    task: str,
+    params: dict,
     job_dir: Path,
+    stage_label: str,
     on_progress: Callable[[float], None] | None = None,
 ) -> np.ndarray:
-    engine = get_engine(preset.denoise_engine)
+    """Runs one engine (denoise, dereverb, or super-resolution) via its worker subprocess,
+    chunking as needed and resampling to/from the engine's native rate.
+    """
+    engine = get_engine(engine_name)
     engine_sr = engine.sample_rates[0]
     x_engine = resample(x, sr, engine_sr)
 
     plan = plan_chunks(x_engine.size, engine_sr, engine.max_chunk_seconds)
     chunks_in = split(x_engine, plan)
 
-    chunk_dir = job_dir / "chunks" / preset.denoise_engine
+    chunk_dir = job_dir / "chunks" / f"{stage_label}_{engine_name}"
     chunk_dir.mkdir(parents=True, exist_ok=True)
 
     manifest = []
@@ -72,27 +91,62 @@ def _run_denoise_stage(
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f)
 
-    run_worker(
-        engine,
-        task="denoise",
-        manifest_path=manifest_path,
-        params={"strength": preset.denoise_strength},
-        on_progress=on_progress,
-    )
+    run_worker(engine, task=task, manifest_path=manifest_path, params=params, on_progress=on_progress)
 
+    # Some model architectures (MDXC in particular) pad internally to a fixed window multiple,
+    # so a chunk can come back a handful of samples longer or shorter than it went in. recombine()
+    # assumes each chunk matches its planned length exactly, so that is enforced here per chunk
+    # rather than only on the final concatenated result.
     chunks_out = []
-    for item in manifest:
+    for item, expected_len in zip(manifest, (e - s for s, e in zip(plan.starts, plan.ends))):
         out_audio, out_sr = read_wav_mono(Path(item["out"]))
         assert out_sr == engine_sr
-        chunks_out.append(out_audio)
+        chunks_out.append(_match_length(out_audio, expected_len))
 
     recombined = recombine(chunks_out, plan, x_engine.size)
-    return resample(recombined, engine_sr, sr)
+    result = resample(recombined, engine_sr, sr)
+    return _match_length(result, x.size)
+
+
+def _score_dnsmos(x: np.ndarray, sr: int, job_dir: Path, label: str) -> dict | None:
+    """Runs the DNSMOS engine on a stage's audio. Returns None (and logs a warning) if the
+    engine isn't installed, since DNSMOS is a diagnostic, not a required part of the pipeline.
+    """
+    try:
+        engine = get_engine("dnsmos")
+    except KeyError:
+        return None
+    if not engine.installed:
+        return None
+
+    score_dir = job_dir / "dnsmos"
+    score_dir.mkdir(parents=True, exist_ok=True)
+    clip_path = score_dir / f"{label}.wav"
+    write_wav(clip_path, x, sr, subtype="FLOAT")
+
+    manifest_path = score_dir / f"{label}_manifest.json"
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump([{"in": str(clip_path)}], f)
+
+    try:
+        result = run_worker(engine, task="score", manifest_path=manifest_path, params={})
+        scores = result["scores"][0]
+    except Exception:  # noqa: BLE001
+        return None
+    finally:
+        clip_path.unlink(missing_ok=True)
+
+    return {
+        "stage": label,
+        "sig": round(scores["sig"], 3) if scores.get("sig") is not None else None,
+        "bak": round(scores["bak"], 3) if scores.get("bak") is not None else None,
+        "ovrl": round(scores["ovrl"], 3) if scores.get("ovrl") is not None else None,
+    }
 
 
 def run_job(
     input_path: Path,
-    preset_key: str,
+    preset_key: str | Preset,
     on_progress: Callable[[str, float], None] | None = None,
     export_intermediate: bool = False,
     job_id: str | None = None,
@@ -101,10 +155,10 @@ def run_job(
     if not input_path.exists():
         raise FileNotFoundError(input_path)
 
-    preset = get_preset(preset_key)
+    preset = get_preset(preset_key) if isinstance(preset_key, str) else preset_key
     job_id, job_dir = new_job_dir(input_path, job_id=job_id)
     logger = job_logger(job_id, job_dir)
-    logger.info("Starting job for %s with preset '%s'", input_path, preset_key)
+    logger.info("Starting job for %s with preset '%s'", input_path, preset.key)
 
     sr = config.internal_sample_rate
 
@@ -134,6 +188,24 @@ def run_job(
         # true-peak-over source (lossy-codec overshoot, hot mic) is here to help debug.
         write_wav(job_dir / "01_original.wav", current, sr, subtype="FLOAT")
 
+    metrics: list[dict] = []
+    score = _score_dnsmos(current, sr, job_dir, "original")
+    if score:
+        metrics.append(score)
+
+    def score_stage(label: str, audio: np.ndarray) -> None:
+        s = _score_dnsmos(audio, sr, job_dir, label)
+        if not s:
+            return
+        if metrics and metrics[-1]["ovrl"] is not None and s["ovrl"] is not None:
+            drop = metrics[-1]["ovrl"] - s["ovrl"]
+            if drop > OVRL_DROP_WARNING_THRESHOLD:
+                logger.warning(
+                    "Stage '%s' lowered DNSMOS OVRL by %.2f (%.2f -> %.2f)",
+                    label, drop, metrics[-1]["ovrl"], s["ovrl"],
+                )
+        metrics.append(s)
+
     # Stage 1: pre-denoise safety limiter. DeepFilterNet (and neural denoisers generally)
     # can produce pathological full-scale oscillating output when fed samples above +-1.0
     # true peak - a real recording defect (hot mic, or overshoot from lossy source codecs
@@ -147,12 +219,54 @@ def run_job(
     # Stage 2: denoise
     if preset.denoise_enabled:
         report("denoise", 0.0)
-        current = _run_denoise_stage(
-            current, sr, preset, job_dir, on_progress=lambda f: report("denoise", f)
+        current = _run_engine_stage(
+            current, sr, preset.denoise_engine, "denoise",
+            {"strength": preset.denoise_strength}, job_dir, "denoise",
+            on_progress=lambda f: report("denoise", f),
         )
         if export_intermediate:
             write_wav(job_dir / "02_denoise.wav", current, sr, subtype="FLOAT")
         report("denoise", 1.0)
+        score_stage("denoise", current)
+
+    # Stage 3: dereverb (optional, wet/dry blended)
+    if preset.dereverb_enabled:
+        report("dereverb", 0.0)
+        dry = current
+        wet = _run_engine_stage(
+            current, sr, preset.dereverb_engine, "dereverb",
+            {}, job_dir, "dereverb",
+            on_progress=lambda f: report("dereverb", f),
+        )
+        strength = preset.dereverb_strength
+        current = (strength * wet + (1 - strength) * dry).astype(np.float32) if strength < 1.0 else wet
+        if export_intermediate:
+            write_wav(job_dir / "03_dereverb.wav", current, sr, subtype="FLOAT")
+        report("dereverb", 1.0)
+        score_stage("dereverb", current)
+
+    # Stage 4: super-resolution. 'auto' only runs it when the source's effective bandwidth
+    # (measured in Stage 0 analysis) is below the threshold; forcing it on already-full-band
+    # audio wastes GPU time for no audible gain.
+    sr_mode = preset.super_resolution_mode
+    run_sr = sr_mode == "always" or (
+        sr_mode == "auto" and analysis_result.bandwidth_hz < preset.super_resolution_bandwidth_threshold_hz
+    )
+    if run_sr:
+        report("super_resolution", 0.0)
+        logger.info(
+            "Running super-resolution: bandwidth was %.0f Hz (threshold %.0f Hz, mode '%s')",
+            analysis_result.bandwidth_hz, preset.super_resolution_bandwidth_threshold_hz, sr_mode,
+        )
+        current = _run_engine_stage(
+            current, sr, preset.super_resolution_engine, "super_resolution",
+            {}, job_dir, "super_resolution",
+            on_progress=lambda f: report("super_resolution", f),
+        )
+        if export_intermediate:
+            write_wav(job_dir / "04_super_resolution.wav", current, sr, subtype="FLOAT")
+        report("super_resolution", 1.0)
+        score_stage("super_resolution", current)
 
     # Stage 6: finishing chain
     report("finishing", 0.0)
@@ -164,6 +278,8 @@ def run_job(
         finished = np.pad(finished, (0, x.size - finished.size))
     elif finished.size > x.size:
         finished = finished[: x.size]
+
+    score_stage("final", finished)
 
     # Stage 7: export
     report("export", 0.0)
@@ -183,10 +299,11 @@ def run_job(
     job_data = {
         "job_id": job_id,
         "input_path": str(input_path),
-        "preset": preset_key,
+        "preset": preset.key,
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "analysis": analysis_result.to_dict(),
         "final_lufs": round(final_lufs, 2),
+        "metrics": metrics,
         "is_video": ingest_info.is_video,
         "output_wav": str(output_wav),
         "output_video": str(output_video) if output_video else None,

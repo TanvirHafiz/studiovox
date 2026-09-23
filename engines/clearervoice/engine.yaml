@@ -1,0 +1,14 @@
+name: clearervoice
+python: engines/clearervoice/env/Scripts/python.exe
+sample_rates: [48000]
+channels: mono
+max_chunk_seconds: 60
+needs_gpu: true
+vram_gb_estimate: 4
+license: Apache-2.0
+tasks: [denoise, super_resolution]
+notes: >
+  torch/torchaudio pinned to 2.7.1 (cu128) for the same reason as the
+  deepfilternet engine: no known-good newer combination has been verified
+  against this codebase yet, and torchaudio >=2.9 removed APIs other
+  denoise engines in this app already depend on.

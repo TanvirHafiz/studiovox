@@ -1,0 +1,15 @@
+name: separator
+python: engines/separator/env/Scripts/python.exe
+sample_rates: [44100]
+channels: mono
+max_chunk_seconds: 600
+needs_gpu: true
+vram_gb_estimate: 4
+license: MIT
+tasks: [vocal_isolation, dereverb]
+notes: >
+  torch/torchaudio pinned to 2.7.1 (cu128), copied from the deepfilternet
+  env rather than re-downloaded (see setup_engines.ps1). Models download
+  into models/separator/ on first use of each model.
+  Vocal isolation model: vocals_mel_band_roformer.ckpt (MelBand Roformer, SDR 12.6).
+  Dereverb model: dereverb_mel_band_roformer_anvuew_sdr_19.1729.ckpt (SDR 19.17).

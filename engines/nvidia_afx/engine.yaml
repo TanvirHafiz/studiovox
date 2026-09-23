@@ -1,0 +1,37 @@
+name: nvidia_afx
+python: .venv/Scripts/python.exe
+sample_rates: [48000]
+channels: mono
+max_chunk_seconds: 30
+needs_gpu: true
+vram_gb_estimate: 2
+license: NVIDIA proprietary (user downloads and installs the SDK separately under NVIDIA's own license; this app never bundles or redistributes it)
+tasks: [generative_restore, dereverb, super_resolution]
+requires_config_path: nvidia_afx_sdk_path
+notes: >
+  Optional adapter around the NVIDIA Maxine Audio Effects (AFX) SDK's
+  effects_demo sample CLI. Set nvidia_afx.sdk_path in config.yaml to the
+  SDK install root to enable it; the app works normally without it
+  (this engine simply will not appear as "installed").
+
+  Uses the app's own venv (worker.py needs only the standard library -
+  it locates and shells out to effects_demo.exe, it doesn't link
+  against the SDK), not a dedicated engine env.
+
+  Task -> AFX effect name mapping:
+    generative_restore -> studio_voice_high_quality (Stage 5 alternative to Resemble Enhance)
+    dereverb            -> dereverb_denoiser (Stage 3 alternative to audio-separator)
+    super_resolution    -> superres (Stage 4 alternative to ClearerVoice)
+  Only the high-quality (offline) effect variants are used, per the plan.
+
+  Best-effort: this could not be verified end-to-end against a real SDK
+  install (it is a proprietary NVIDIA developer download this
+  environment does not have). worker.py searches the configured SDK
+  tree for effects_demo.exe and each effect's model package rather than
+  assuming a fixed path, since exact install layouts are not documented
+  consistently across SDK versions, and it reports exactly what it
+  searched and found if something is missing. If effects_demo.exe
+  rejects the generated config, its stderr is surfaced verbatim so the
+  config format (key-value pairs: effect/sample_rate/model/
+  input_wav_list/output_wav_list/intensity_ratio) can be corrected
+  against the real SDK's documentation for the installed version.

@@ -26,8 +26,24 @@ class EngineSpec:
     raw: dict[str, Any]
 
     @property
+    def not_installed_reason(self) -> str | None:
+        """None if installed; otherwise a specific, user-actionable reason why not."""
+        if not self.python.exists():
+            return f"Python environment missing (expected at {self.python})."
+        # Some engines (nvidia_afx) don't get their own env - they wrap an external SDK the
+        # user installs separately, so "installed" also depends on a configured path existing.
+        requires = self.raw.get("requires_config_path")
+        if requires:
+            value = getattr(config, requires, None)
+            if not value:
+                return f"config.yaml's {requires} is not set."
+            if not Path(value).exists():
+                return f"config.yaml's {requires} ({value}) does not exist."
+        return None
+
+    @property
     def installed(self) -> bool:
-        return self.python.exists()
+        return self.not_installed_reason is None
 
 
 def _load_one(engine_dir: Path) -> EngineSpec | None:

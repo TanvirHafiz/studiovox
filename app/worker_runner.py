@@ -5,6 +5,7 @@ parsing PROGRESS/RESULT lines from stdout.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 from typing import Callable
@@ -25,7 +26,7 @@ def run_worker(
     on_progress: Callable[[float], None] | None = None,
 ) -> dict:
     if not engine.installed:
-        raise WorkerError(f"Engine '{engine.name}' is not installed (missing {engine.python}).")
+        raise WorkerError(f"Engine '{engine.name}' is not installed: {engine.not_installed_reason}")
 
     cmd = [
         str(engine.python),
@@ -45,6 +46,10 @@ def run_worker(
     engine_cwd = config.models_dir / engine.name
     engine_cwd.mkdir(parents=True, exist_ok=True)
 
+    env = os.environ.copy()
+    if config.nvidia_afx_sdk_path:
+        env["STUDIOVOX_NVIDIA_AFX_SDK_PATH"] = config.nvidia_afx_sdk_path
+
     proc = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
@@ -52,6 +57,7 @@ def run_worker(
         text=True,
         bufsize=1,
         cwd=str(engine_cwd),
+        env=env,
     )
 
     result: dict | None = None

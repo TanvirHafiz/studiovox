@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from app.analysis import analyze
 from app.audio_io import read_wav_mono
 from app.config import REPO_ROOT, config
+from app.engines import list_engines
 from app.health import run_health_check
 from app.ingest import decode_to_wav
 from app.job_manager import manager
@@ -64,6 +65,21 @@ def presets_endpoint():
     return {
         key: {"name": p.name, "description": p.description}
         for key, p in list_presets().items()
+    }
+
+
+@app.get("/api/engines")
+def engines_endpoint():
+    return {
+        name: {
+            "tasks": spec.tasks,
+            "installed": spec.installed,
+            "not_installed_reason": spec.not_installed_reason,
+            "needs_gpu": spec.needs_gpu,
+            "vram_gb_estimate": spec.vram_gb_estimate,
+            "license": spec.license,
+        }
+        for name, spec in list_engines().items()
     }
 
 

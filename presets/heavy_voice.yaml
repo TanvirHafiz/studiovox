@@ -4,7 +4,7 @@ stages:
   denoise:
     enabled: true
     engine: deepfilternet
-    strength: 0.6
+    strength: 1.0
 finishing:
   high_pass_hz: 30
   high_pass_db_per_oct: 12

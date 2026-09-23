@@ -8,4 +8,6 @@ logs/
 *.wav
 *.flac
 *.mp3
+!examples/*.wav
+!examples/*.mp3
 .DS_Store

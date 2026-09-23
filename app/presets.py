@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import re
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,8 @@ import yaml
 
 from app.config import config
 from app.dsp.chain import FinishingParams
+
+_KEY_PATTERN = re.compile(r"^[a-z0-9_]+$")
 
 
 @dataclass
@@ -84,6 +87,15 @@ class Preset:
     def generative_restore_crossover_hz(self) -> float:
         return float(self.stages.get("generative_restore", {}).get("crossover_hz", 4000))
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "key": self.key,
+            "name": self.name,
+            "description": self.description,
+            "stages": self.stages,
+            "finishing": asdict(self.finishing),
+        }
+
 
 def _load_one(path: Path) -> Preset:
     with open(path, "r", encoding="utf-8") as f:
@@ -114,3 +126,22 @@ def get_preset(key: str) -> Preset:
     if key not in presets:
         raise KeyError(f"Unknown preset '{key}'. Available: {list(presets.keys())}")
     return presets[key]
+
+
+def sanitize_key(name: str) -> str:
+    key = re.sub(r"[^a-z0-9_]+", "_", name.strip().lower()).strip("_")
+    if not key:
+        raise ValueError("That name doesn't produce a usable preset key (letters/digits only).")
+    return key
+
+
+def save_preset(key: str, name: str, description: str, stages: dict[str, Any], finishing: dict[str, Any]) -> Path:
+    """Writes presets/<key>.yaml. Overwrites an existing preset with the same key."""
+    if not _KEY_PATTERN.match(key):
+        raise ValueError(f"Invalid preset key '{key}': use only lowercase letters, digits, and underscores.")
+    config.presets_dir.mkdir(parents=True, exist_ok=True)
+    path = config.presets_dir / f"{key}.yaml"
+    data = {"name": name, "description": description, "stages": stages, "finishing": finishing}
+    with open(path, "w", encoding="utf-8") as f:
+        yaml.safe_dump(data, f, sort_keys=False)
+    return path

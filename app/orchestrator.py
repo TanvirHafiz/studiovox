@@ -368,3 +368,40 @@ def run_job(
         output_video=output_video,
         job_json_path=job_json_path,
     )
+
+
+@dataclass
+class BatchItemResult:
+    input_path: Path
+    status: str  # "done" | "error"
+    job_result: JobResult | None = None
+    error: str | None = None
+
+
+def run_batch(
+    input_paths: list[Path],
+    preset_key: str | Preset,
+    on_progress: Callable[[int, int, str, str, float], None] | None = None,
+) -> list[BatchItemResult]:
+    """Processes files one at a time (not in parallel: everything here shares one GPU, so
+    concurrent jobs would just contend for it rather than go faster). One file's failure is
+    recorded and does not stop the rest of the batch.
+
+    on_progress(file_index, total_files, filename, stage, stage_frac)
+    """
+    results: list[BatchItemResult] = []
+    total = len(input_paths)
+
+    for i, input_path in enumerate(input_paths):
+
+        def report(stage: str, frac: float, _i=i, _name=input_path.name) -> None:
+            if on_progress:
+                on_progress(_i, total, _name, stage, frac)
+
+        try:
+            job_result = run_job(input_path, preset_key, on_progress=report)
+            results.append(BatchItemResult(input_path=input_path, status="done", job_result=job_result))
+        except Exception as e:  # noqa: BLE001
+            results.append(BatchItemResult(input_path=input_path, status="error", error=str(e)))
+
+    return results

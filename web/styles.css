@@ -273,3 +273,67 @@ tr.metric-row-flagged td {
   margin-bottom: 4px;
   color: var(--muted);
 }
+
+.pipeline-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.secondary-button {
+  display: inline-block;
+  margin-top: 14px;
+  padding: 10px 18px;
+  background: transparent;
+  color: var(--text);
+  font-weight: 500;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.secondary-button:hover {
+  border-color: var(--accent);
+}
+
+.file-list-row, .history-row, .batch-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.file-list-row:last-child, .history-row:last-child, .batch-summary-row:last-child {
+  border-bottom: none;
+}
+
+.history-row {
+  cursor: pointer;
+}
+
+.history-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.batch-summary-row.status-error {
+  color: var(--err);
+}
+
+.batch-summary-row.status-done {
+  color: var(--ok);
+}
+
+.remove-file-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 6px;
+}
+
+.remove-file-btn:hover {
+  color: var(--err);
+}

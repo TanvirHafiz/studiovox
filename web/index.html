@@ -22,8 +22,8 @@
   <section class="panel">
     <h2>Process a file</h2>
     <div id="dropzone" class="dropzone">
-      <p>Drag and drop an audio or video file here, or click to browse.</p>
-      <input id="file-input" type="file" accept="audio/*,video/*" hidden>
+      <p>Drag and drop one or more audio/video files here, or click to browse. Two or more files run as a batch.</p>
+      <input id="file-input" type="file" accept="audio/*,video/*" multiple hidden>
     </div>
     <div id="file-info" class="hidden">
       <div class="file-row">
@@ -33,6 +33,7 @@
       <div id="analysis-warnings"></div>
       <div id="analysis-metrics" class="metrics-grid"></div>
     </div>
+    <div id="batch-file-list" class="hidden"></div>
   </section>
 
   <section id="pipeline-panel" class="panel hidden">
@@ -40,13 +41,23 @@
     <label for="preset-select">Preset</label>
     <select id="preset-select"></select>
     <p id="preset-description" class="detail"></p>
-    <button id="run-button" class="primary-button">Run</button>
+    <div class="pipeline-actions">
+      <button id="run-button" class="primary-button">Run</button>
+      <button id="save-preset-button" class="secondary-button">Save as new preset...</button>
+    </div>
   </section>
 
   <section id="progress-panel" class="panel hidden">
     <h2>Progress</h2>
     <div id="stage-label" class="detail"></div>
     <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+  </section>
+
+  <section id="batch-progress-panel" class="panel hidden">
+    <h2>Batch progress</h2>
+    <div id="batch-stage-label" class="detail"></div>
+    <div class="progress-bar"><div id="batch-progress-fill" class="progress-fill"></div></div>
+    <div id="batch-summary-table"></div>
   </section>
 
   <section id="results-panel" class="panel hidden">
@@ -65,6 +76,11 @@
       <a id="download-video-link" class="primary-button hidden" href="#" download>Download video</a>
     </div>
     <div id="metrics-table" class="metrics-table-wrap"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Job history</h2>
+    <div id="history-list"><p class="detail">Loading...</p></div>
   </section>
 </main>
 <audio id="orig-audio" preload="auto" crossorigin="anonymous"></audio>

@@ -280,8 +280,34 @@ async function loadResults(jobId) {
   }
 
   renderMetricsTable(data.job.metrics || []);
+  renderIntegrityWarning(data.job.integrity);
 
   document.getElementById("results-panel").classList.remove("hidden");
+}
+
+function renderIntegrityWarning(integrity) {
+  const container = document.getElementById("integrity-warning");
+  if (!integrity || !integrity.ran || !integrity.flagged) {
+    container.innerHTML = "";
+    return;
+  }
+
+  const segmentRows = integrity.differing_segments
+    .map(
+      (s) =>
+        `<li>${s.start.toFixed(1)}s-${s.end.toFixed(1)}s: "${s.before_text}" -> "${s.after_text}"</li>`
+    )
+    .join("");
+
+  container.innerHTML = `
+    <div class="integrity-warning">
+      <strong>Content integrity check flagged this job</strong>
+      <p class="detail">Word error rate ${(integrity.wer * 100).toFixed(1)}% between the audio before and after
+      generative restoration. This can mean the generative step changed or invented words - listen to the
+      flagged segments before trusting this output.</p>
+      <ul>${segmentRows}</ul>
+    </div>
+  `;
 }
 
 function renderMetricsTable(metrics) {

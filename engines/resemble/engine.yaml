@@ -1,0 +1,27 @@
+name: resemble
+python: engines/resemble/env/Scripts/python.exe
+sample_rates: [44100]
+channels: mono
+max_chunk_seconds: 30
+needs_gpu: true
+vram_gb_estimate: 6
+license: Apache-2.0
+tasks: [generative_restore]
+notes: >
+  Optional engine. torch/torchaudio pinned to 2.1.1+cu118 (the package's own
+  exact pin), numpy pinned <2.0 (deepspeed 0.11.2 imports numpy.BUFSIZE,
+  removed in numpy 2.0). Three Windows-specific issues had to be worked
+  around, all handled by setup_engines.ps1 and worker.py:
+    1. resemble-enhance hard-pins deepspeed==0.12.4, which fails to compile
+       on Windows (no async I/O support). Installed a community precompiled
+       wheel (deepspeed 0.11.2+cuda118) instead; functionally compatible
+       for inference.
+    2. The bundled model's hparams.yaml was saved with pathlib.PosixPath
+       objects, which Windows Python refuses to instantiate. worker.py
+       monkeypatches pathlib.PosixPath = pathlib.WindowsPath before loading.
+    3. pandas (unpinned by resemble-enhance) pulled in a version requiring
+       tabulate>=0.9, conflicting with resemble-enhance's own tabulate==0.8.10
+       pin; tabulate is bumped past 0.8.10.
+  Output is always blended (never used at full strength) and gated by the
+  faster-whisper integrity check; see app/dsp/blend.py and Stage 5 in
+  orchestrator.py.

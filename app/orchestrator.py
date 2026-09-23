@@ -17,10 +17,12 @@ from app.analysis import analyze
 from app.audio_io import read_wav_mono, resample, write_wav
 from app.chunking import plan_chunks, recombine, split
 from app.config import config
+from app.dsp.blend import align_to, band_blend, detect_comb_filtering, time_blend
 from app.dsp.chain import run_finishing_chain
 from app.dsp.loudness import measure_lufs, true_peak_limiter
 from app.engines import get_engine
 from app.ingest import decode_to_wav, remux_audio_into_video
+from app.integrity import run_integrity_check
 from app.logging_setup import job_logger
 from app.presets import Preset, get_preset
 from app.worker_runner import run_worker
@@ -268,6 +270,50 @@ def run_job(
         report("super_resolution", 1.0)
         score_stage("super_resolution", current)
 
+    # Stage 5: generative restore (optional, off by default except the Rescue preset).
+    # Speech mode only - a generative speech model is not meaningful on singing.
+    integrity_result = None
+    if preset.generative_restore_enabled and analysis_result.mode_guess != "singing":
+        report("generative_restore", 0.0)
+        faithful = current
+        generative_raw = _run_engine_stage(
+            current, sr, preset.generative_restore_engine, "generative_restore",
+            {}, job_dir, "generative_restore",
+            on_progress=lambda f: report("generative_restore", f),
+        )
+        aligned, lag = align_to(faithful, generative_raw, sr)
+        logger.info("Generative restore alignment: shifted by %d samples (%.1f ms)", lag, 1000 * lag / sr)
+
+        blend_mode = preset.generative_restore_blend_mode
+        if blend_mode == "band":
+            current = band_blend(
+                faithful, aligned, sr,
+                crossover_hz=preset.generative_restore_crossover_hz,
+                wet=preset.generative_restore_wet,
+            )
+        else:
+            current = time_blend(faithful, aligned, wet=preset.generative_restore_wet)
+            comb_flagged, comb_details = detect_comb_filtering(current, sr)
+            if comb_flagged:
+                logger.warning("Comb filtering detected in time blend: %s", comb_details)
+
+        if export_intermediate:
+            write_wav(job_dir / "05_generative_restore.wav", current, sr, subtype="FLOAT")
+        report("generative_restore", 1.0)
+        score_stage("generative_restore", current)
+
+        # Integrity check: did the generative model invent or change words? Compares the
+        # faithful pre-restore audio against the blended result, since that is what the
+        # listener will actually hear.
+        report("integrity_check", 0.0)
+        integrity_result = run_integrity_check(faithful, current, sr, job_dir)
+        if integrity_result.ran and integrity_result.flagged:
+            logger.warning(
+                "Content integrity check flagged this job: WER %.1f%% (%d differing segment(s))",
+                integrity_result.wer * 100, len(integrity_result.differing_segments),
+            )
+        report("integrity_check", 1.0)
+
     # Stage 6: finishing chain
     report("finishing", 0.0)
     finished = run_finishing_chain(current, sr, preset.finishing)
@@ -304,6 +350,7 @@ def run_job(
         "analysis": analysis_result.to_dict(),
         "final_lufs": round(final_lufs, 2),
         "metrics": metrics,
+        "integrity": integrity_result.to_dict() if integrity_result else None,
         "is_video": ingest_info.is_video,
         "output_wav": str(output_wav),
         "output_video": str(output_video) if output_video else None,

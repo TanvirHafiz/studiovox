@@ -1,0 +1,12 @@
+name: whisper
+python: engines/whisper/env/Scripts/python.exe
+sample_rates: [16000]
+channels: mono
+max_chunk_seconds: 3600
+needs_gpu: true
+vram_gb_estimate: 3
+license: MIT
+tasks: [transcribe]
+notes: >
+  faster-whisper, ctranslate2 backend. No torch dependency, so no version
+  pinning needed here. large-v3 model, downloaded on first use.

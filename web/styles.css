@@ -254,3 +254,22 @@ table.metrics-table th {
 tr.metric-row-flagged td {
   color: var(--warn);
 }
+
+.integrity-warning {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--warn);
+  border-radius: 8px;
+  background: rgba(224, 163, 62, 0.08);
+  font-size: 13px;
+}
+
+.integrity-warning ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.integrity-warning li {
+  margin-bottom: 4px;
+  color: var(--muted);
+}

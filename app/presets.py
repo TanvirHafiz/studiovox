@@ -58,6 +58,27 @@ class Preset:
     def super_resolution_bandwidth_threshold_hz(self) -> float:
         return float(self.stages.get("super_resolution", {}).get("bandwidth_threshold_hz", 14000))
 
+    @property
+    def generative_restore_enabled(self) -> bool:
+        return bool(self.stages.get("generative_restore", {}).get("enabled", False))
+
+    @property
+    def generative_restore_engine(self) -> str:
+        return self.stages.get("generative_restore", {}).get("engine", "resemble")
+
+    @property
+    def generative_restore_blend_mode(self) -> str:
+        """'band' (default, safer - see app/dsp/blend.py) or 'time'."""
+        return self.stages.get("generative_restore", {}).get("blend_mode", "band")
+
+    @property
+    def generative_restore_wet(self) -> float:
+        return float(self.stages.get("generative_restore", {}).get("wet", 0.4))
+
+    @property
+    def generative_restore_crossover_hz(self) -> float:
+        return float(self.stages.get("generative_restore", {}).get("crossover_hz", 4000))
+
 
 def _load_one(path: Path) -> Preset:
     with open(path, "r", encoding="utf-8") as f:

@@ -19,7 +19,7 @@ if not exist ".venv" (
     )
 )
 
-start "" cmd /c "timeout /t 2 >nul && start http://127.0.0.1:7860"
+start "" powershell -NoProfile -WindowStyle Hidden -Command "for ($i = 0; $i -lt 60; $i++) { try { Invoke-WebRequest -UseBasicParsing -Uri http://127.0.0.1:7860/api/health -TimeoutSec 1 | Out-Null; break } catch { Start-Sleep -Seconds 1 } }; Start-Process http://127.0.0.1:7860"
 uv run uvicorn app.main:app --host 127.0.0.1 --port 7860
 
 endlocal
